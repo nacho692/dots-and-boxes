@@ -70,3 +70,48 @@ class Board():
 		for _edge in self.taken_edges:
 			yield _edge
 		return
+
+class BoardSaver():
+	"""
+	A bit trie set that stores all the boards so as to compare for existence quickly.
+	"""
+	def __init__(self):
+		self.bit_trie = {}
+		return
+
+	def contains_board(self, board):
+		"""
+		Parameters:
+		board (Board)
+
+		Returns:
+		bool indicating whether is included or not. 
+		"""
+		is_contained = True
+		root = self.bit_trie
+
+		for _taken_edge in board.get_ordered_edges():
+			if _taken_edge in root.keys() and is_contained:
+				root = root[_taken_edge] # keep traversing the trie
+			else:
+				is_contained = False
+				break
+
+		return is_contained
+
+	def add_board(self, board):
+		"""
+		Add a board to the set.
+
+		Parameters:
+		board (Board)
+		"""
+		root = self.bit_trie
+
+		for _taken_edge in board.get_ordered_edges():
+			if _taken_edge not in root.keys():
+				root[_taken_edge] = {}
+			
+			root = root[_taken_edge]
+
+		return
