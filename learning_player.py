@@ -17,11 +17,40 @@ class Board():
 		"""
 		return [False] * self.count_cols * self.count_rows * 2
 
+	def check_coordinate_bound(self, coordinate):
+		"""
+		Check coordinate is inside rows/cols board bounds.
+		"""
+		if self.count_rows <= coordinate[0] or self.count_cols <= coordinate[1]:
+			raise Exception("Invalid coordinate {} for rows {} and cols {}".format(coordinate, self.count_rows, self.count_cols))
+		return
+
+	def check_existing_edge(self, first_coordinate, second_coordinate):
+		"""
+		Check there is an edge between coordinates
+		"""
+		if first_coordinate == second_coordinate:
+			raise Exception("first_coordinate {} equals second_coordinate {}".format(first_coordinate, second_coordinate))
+
+		if second_coordinate[0] < first_coordinate[0] or second_coordinate[1] < first_coordinate[1]:
+			raise Exception("first_coordinate {} is not on top or left of second_coordinate {}".format(first_coordinate, second_coordinate))
+
+		if first_coordinate[0] not in range(second_coordinate[0] - 1, second_coordinate[0] + 1) or first_coordinate[1] not in range(second_coordinate[1] - 1, second_coordinate[1] + 1):
+			raise Exception("first_coordinate {} is contiguous to second_coordinate {}".format(first_coordinate, second_coordinate))
+		return
+
+
 	def get_board_position(self, first_coordinate, second_coordinate):
 		_second_coordinate_is_on_right = first_coordinate[1] == second_coordinate[1] + 1
 
 		position = first_coordinate[0] * self.count_cols + 2 * first_coordinate[1] # each node has two indexes in the board
 		position += 0 if _second_coordinate_is_on_right else 1 # bits are ordered as right and down edges respectively
+
+		# only to check errors during development
+		for _coordinate in [first_coordinate, second_coordinate]:
+			self.check_coordinate_bound(_coordinate)
+
+		self.check_existing_edge(first_coordinate, second_coordinate)
 
 		return position
 
