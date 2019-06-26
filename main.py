@@ -1,8 +1,7 @@
-import time
 import sys
 from dots_boxes import DotsAndBoxes
 
-env = DotsAndBoxes()
+env = DotsAndBoxes(2)
 env.render()
 
 inp = ""
@@ -16,5 +15,7 @@ while inp != "quit":
 
 
     action = list(map(splitter, inp.split(" ")))
-    env.step(action)
+    observation, reward, done, _ = env.step(action)
     env.render()
+    if done:
+        env.reset()

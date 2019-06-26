@@ -1,12 +1,16 @@
 import pygame
 import gym
 import itertools
-from gym import spaces, logger
-from gym.utils import seeding
 
 
 class DotsAndBoxes(gym.Env):
-    class Box():
+    class Box:
+        """
+        A Box is the object you want to capture more of to win the game. It has four corners (Nodes) and four sides
+        which connect the Nodes.
+        Whenever the four sides of the box are filled its "control" is handed to the last player to introduce a new
+        side.
+        """
 
         def __init__(self, position, corners):
             assert len(corners) == 4, "Each box has 4 corners"
@@ -26,10 +30,16 @@ class DotsAndBoxes(gym.Env):
             if len(self.sides) == 4:
                 self.controller = player
 
-    class Node():
+        def get_controller(self):
+            return self.controller
 
-        def __init__(self, position):
-            self.index = position[0] + position[1] * 4
+    class Node:
+        """
+        A Node is one of the dots connected by edges. They are the corner of the Boxes.
+        """
+
+        def __init__(self, position, index):
+            self.index = index
             self.position = position
             self.connected_nodes = set()
             self.boxes = set()
@@ -61,19 +71,10 @@ class DotsAndBoxes(gym.Env):
 
         self.n = (size + 1) * (size + 1)
         self.size = size
-        self.edges = [[DotsAndBoxes.Node((i, j)) for j in range(self.size + 1)] for i in range(self.size + 1)]
-        self.boxes = [[None for j in range(self.size)] for i in range(self.size)]
-        for i in range(self.size):
-            for j in range(self.size):
-                corners = set()
-                corners.add(self.edges[i][j])
-                corners.add(self.edges[i][j + 1])
-                corners.add(self.edges[i + 1][j])
-                corners.add(self.edges[i + 1][j + 1])
-                self.boxes[i][j] = DotsAndBoxes.Box((i, j), corners)
-
-        self.points_player_1 = 0
-        self.points_player_2 = 0
+        self.nodes = []
+        self.boxes = []
+        self.done = False
+        self.reset()
 
         # Rendering variables
         self.screen_width = 640
@@ -90,18 +91,42 @@ class DotsAndBoxes(gym.Env):
         Args:
             action: A tuple of positions. A position is a tuple indicating the node by position, (x, y) indicating
             the nodes to connect
+        Returns:
+            observation (object): Agent's observation of the current environment.
+            reward (float) : amount of reward returned after previous action
+            done (bool): whether the episode has ended, in which case further step() calls will return undefined results
+            info (dict): contains auxiliary diagnostic information (helpful for debugging, and sometimes learning)
         """
+        assert not self.done
         pos_i = action[0]
         pos_j = action[1]
 
         assert abs(pos_i[0] - pos_j[0]) + abs(pos_i[1] - pos_j[1]) == 1, "Nodes are not adjacent"
 
-        node_i = self.edges[pos_i[0]][pos_i[1]]
-        node_j = self.edges[pos_j[0]][pos_j[1]]
+        node_i = self.nodes[pos_i[0]][pos_i[1]]
+        node_j = self.nodes[pos_j[0]][pos_j[1]]
 
         assert not node_i.is_connected(node_j), "The edge already exists"
 
         node_i.connect_to(node_j, 1)
+
+        def get_edges(u):
+            return map(lambda v: (u.position, v.position), filter(lambda v: v.index > u.index, u.connected_nodes))
+
+        observation = itertools.chain.from_iterable(map(get_edges, itertools.chain.from_iterable(self.nodes)))
+        player_1_points = list(filter(lambda b: b.get_controller() == 1, itertools.chain.from_iterable(self.boxes)))
+        player_2_points = list(filter(lambda b: b.get_controller() == 2, itertools.chain.from_iterable(self.boxes)))
+        total_boxes = self.size * self.size
+        self.done = abs(len(player_1_points) - len(player_2_points)) > \
+                    total_boxes - (len(player_1_points) + len(player_2_points))
+        reward = 0
+        if self.done:
+            if len(player_1_points) > len(player_2_points):
+                reward = 1
+            else:
+                reward = -1
+
+        return observation, reward, self.done, None
 
     def render(self, mode='human'):
 
@@ -120,12 +145,12 @@ class DotsAndBoxes(gym.Env):
 
         self.screen.fill(BLACK)
 
-        for node in itertools.chain.from_iterable(self.edges):
-            n_s_pos = self.get_node_screen_position(node.position)
+        for node in itertools.chain.from_iterable(self.nodes):
+            n_s_pos = self._get_node_screen_position(node.position)
             for other_node in node.connected_nodes:
                 if other_node.index < node.index:
                     pass
-                on_s_pos = self.get_node_screen_position(other_node.position)
+                on_s_pos = self._get_node_screen_position(other_node.position)
                 pygame.draw.line(self.screen, GREEN, n_s_pos, on_s_pos, width=1)
 
             pygame.draw.circle(self.screen, RED, n_s_pos, 5, width=5)
@@ -133,18 +158,33 @@ class DotsAndBoxes(gym.Env):
             self.screen.blit(text, (n_s_pos[0] - 16, n_s_pos[1] + 10))
 
         for box in itertools.chain.from_iterable(self.boxes):
-            text = self.font.render(str(box.controller), True, WHITE, BLACK)
-            self.screen.blit(text, self.get_box_screen_position(box.position))
+            text = self.font.render(str(box.get_controller()), True, WHITE, BLACK)
+            self.screen.blit(text, self._get_box_screen_position(box.position))
 
         pygame.display.update()
 
-    def get_box_screen_position(self, pos):
-        corner_position = self.get_node_screen_position(pos)
+    def reset(self):
+        self.nodes = [[DotsAndBoxes.Node((i, j), i + j * self.size) for j in range(self.size + 1)]
+                      for i in range(self.size + 1)]
+        self.boxes = [[None for _ in range(self.size)] for _ in range(self.size)]
+        for i in range(self.size):
+            for j in range(self.size):
+                corners = set()
+                corners.add(self.nodes[i][j])
+                corners.add(self.nodes[i][j + 1])
+                corners.add(self.nodes[i + 1][j])
+                corners.add(self.nodes[i + 1][j + 1])
+                self.boxes[i][j] = DotsAndBoxes.Box((i, j), corners)
+
+        self.done = False
+
+    def _get_box_screen_position(self, pos):
+        corner_position = self._get_node_screen_position(pos)
         box_position = (corner_position[0] + self.box_step // 2, corner_position[1] + self.box_step // 2)
 
         return box_position
 
-    def get_node_screen_position(self, pos):
+    def _get_node_screen_position(self, pos):
         i, j = pos
 
         starting_point = (self.screen_width // 2 - self.display_size // 2,
