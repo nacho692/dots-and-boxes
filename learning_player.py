@@ -115,3 +115,44 @@ class BoardSaver():
 			root = root[_taken_edge]
 
 		return
+
+class GameStatus():
+	"""
+	Represent a status of a game: board, taken edges, players' points.
+
+	Board is represented as a vector of bools where each coordenate in the map has two bits,
+	one for its right edge (if any) and a second bit for its down edge (if any).
+	"""
+	def __init__(self, count_rows, count_cols):
+		self.count_rows = count_rows
+		self.count_cols = count_cols
+		self.points_player_1 = 0
+		self.points_player_2 = 0
+		self.board = Board(self.count_rows, self.count_cols)
+		return
+
+	def save_players_points(self, points_player_1, points_player_2):
+		self.points_player_1 = points_player_1
+		self.points_player_2 = points_player_2
+		return
+
+	def stores_entire_state(self, points_player_1, points_player_2, taken_edges):
+		"""
+		points_player_1 :int:
+		points_player_2 :int:
+		taken_edges :list: of edges, where and edge is a pair of coordinates and a coordinate a pair of int
+		"""
+		self.save_players_points(points_player_1, points_player_2)
+		self.board = Board(self.count_rows, self.count_cols) # Initialize all edges as unused, represented with False value
+		self.board.update_taken_edges(taken_edges)
+		return
+
+	def update_state_with_taken_edges(self, points_player_1, points_player_2, taken_edges):
+		"""
+		points_player_1 :int:
+		points_player_2 :int:
+		taken_edges :list: of edges, where and edge is a pair of coordinates and a coordinate a pair of int
+		"""
+		self.save_players_points(points_player_1, points_player_2)
+		self.board.update_taken_edges(taken_edges)
+		return
