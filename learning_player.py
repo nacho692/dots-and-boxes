@@ -16,25 +16,28 @@ class Board():
 	
 	Note that some of this edges won't be used, for example no edge which start in dot (1,1) can be selected. 
 	"""
-	def __init__(self, count_rows, count_cols):
+	def __init__(self, count_rows, count_cols, taken_edges = []):
 		self.count_rows = count_rows
 		self.count_cols = count_cols
-		self.taken_edges = self.clean_board()
+		self.edges = self.clean_board()
+		self.update_taken_edges(taken_edges)
 		return
 
 	def __hash__(self):
 		mask = 0
-		for _ith, _bool in enumerate(self.taken_edges):
+		for _ith, _bool in enumerate(self.edges):
 			mask &= _bool << _ith
 		return mask
 
-	def __eq__(self):
-		_are_equal = self.count_rows == other_game_status.count_rows and self.count_cols == other_game_status.count_cols
+	def __eq__(self, other_board):
+		_are_equal = self.count_rows == other_board.count_rows and self.count_cols == other_board.count_cols
 		
-		for _bit_izq, _bit_der in zip(self.board.get_ordered_edges_values(), other_game_status.board.get_ordered_edges_values()):
-			if not _are_equal and _bit_izq != _bit_der:
-				_are_equal = False
-				break
+		if other_board:
+
+			for _bit_izq, _bit_der in zip(self.get_ordered_edges_values(), other_board.get_ordered_edges_values()):
+				_are_equal = _bit_izq == _bit_der
+				if not _are_equal:
+					break
 
 		return _are_equal
 
@@ -85,7 +88,7 @@ class Board():
 		taken_edges :list: of edges, where and edge is a pair of coordinates and a coordinate a pair of int
 		"""
 		for (_first_coordinate, _second_coordinate) in taken_edges:
-			self.taken_edges[self.get_board_position(_first_coordinate, _second_coordinate)] = True
+			self.edges[self.get_board_position(_first_coordinate, _second_coordinate)] = True
 		return
 
 	def get_ordered_edges_values(self):
@@ -93,7 +96,7 @@ class Board():
 		Yields a boolean for each edge indicating wether it is or not used.
 		Edges are traversed in right-down order in (0,0), (0,1), ... (last_row, last_col) order.
 		"""
-		for _edge in self.taken_edges:
+		for _edge in self.edges:
 			yield _edge
 		return
 
@@ -131,7 +134,7 @@ class Board():
 			
 			for _actual_edge in self.__get_edges_coordinates():
 				_rotated_edge = self.__rotate_edge(*_actual_edge)
-				_rotate_board.taken_edges[self.get_board_position(*_rotated_edge)] = _prev_rotated_board.taken_edges[self.get_board_position(*_actual_edge)]
+				_rotate_board.edges[self.get_board_position(*_rotated_edge)] = _prev_rotated_board.edges[self.get_board_position(*_actual_edge)]
 
 			yield _rotate_board
 			yield _rotate_board.reflect()
@@ -157,18 +160,34 @@ class Board():
 		
 		for _edge in self.__get_edges_coordinates():
 			_reflected_edge = self.__reflect_edge(*_edge)
-			_reflected_board.taken_edges[self.get_board_position(*_reflected_edge)] = self.taken_edges[self.get_board_position(*_edge)]
+			_reflected_board.edges[self.get_board_position(*_reflected_edge)] = self.edges[self.get_board_position(*_edge)]
 
 		return _reflected_board
+
+	def taken_edges(self):
+		return [x for x in self.__get_edges_coordinates() if self.edges[self.get_board_position(*x)]]
 
 
 class BoardSaver():
 	def contains_board(self, board):
+		"""
+		Returns wheter the exactly board is contained.
+		"""
 		raise Exception()
 	
 	def add_board(self, board):
 		raise Exception()
 	
+	def contains_equivalent_board(self, board):
+		"""
+		Return whether any equivalent board is contained.
+		"""
+		for rotated_board in board.rotations():
+			if self.contains_board(rotated_board):
+				return True
+		
+		return False
+
 	def equivalent_board(self, board):
 		for rotated_board in board.rotations():
 			if self.contains_board(rotated_board):
@@ -201,10 +220,8 @@ class BoardHashSaver(BoardSaver):
 		Parameters:
 		board (Board)
 		"""
-		equivalent_board = self.equivalent_board(board)
-
-		if not self.contains_board(equivalent_board):  # only add it if it is new
-			self.boards[equivalent_board] = 0
+		if not self.contains_equivalent_board(board):  # only add it if it is new
+			self.boards[board] = 0
 		
 		return
 
@@ -243,9 +260,7 @@ class BoardTrieSaver(BoardSaver):
 		Parameters:
 		board (Board)
 		"""
-		equivalent_board = self.equivalent_board(board)
-
-		if not self.contains_board(equivalent_board): # only add it if it is new
+		if not self.contains_equivalent_board(board): # only add it if it is new
 			root = self.bit_trie
 
 			for _taken_edge in board.get_ordered_edges_values():
@@ -297,8 +312,24 @@ class GameStatus():
 
 
 # example
-# s = BoardHashSaver()
-# gs = GameStatus(rows, cols)
-# gs.update_state_with_taken_edges(lista_de_tuplas)
-# gs.board tiene el tablero
-# s = s.add_board(gs.board)
+if __name__ == "__main__":
+	rows = 3
+	cols = 3
+	list_of_tuples = [((0,1), (1,1)), ((2,1),(2,2))]
+	list_of_tuples_rotated = [((1,0), (2,0)), ((1,1),(1,2))]
+
+	board_saver = BoardHashSaver()
+	board = Board(rows, cols, list_of_tuples)
+	board_rotated = Board(rows, cols, list_of_tuples_rotated)
+
+	assert(False == board_saver.contains_board(board)) # output False
+	assert(False == board_saver.contains_board(board_rotated)) # output False
+	assert(False == board_saver.contains_equivalent_board(board)) # output False
+	assert(False == board_saver.contains_equivalent_board(board_rotated)) # output False
+
+	board_saver.add_board(board)
+
+	assert(True == board_saver.contains_board(board)) # output True
+	assert(False == board_saver.contains_board(board_rotated)) # output False
+	assert(True == board_saver.contains_equivalent_board(board)) # output True
+	assert(True == board_saver.contains_equivalent_board(board_rotated)) # output True
