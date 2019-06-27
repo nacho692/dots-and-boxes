@@ -2,10 +2,19 @@ import itertools
 
 class Board():
 	"""
-	Represent the board as an array of booleans where each dot has 2 bools.
-	Dots indexes in array are in (0,0), (0,1), ..., (<last_row>, <last_col>) order.
-	A pair of booleans for a dot means <edge_going_down>, <edge_going_to_the_right> respectively.
-	The value of the boolean indicates whether the edge has been added by a player or not. 
+	Represent the board as an array of booleans where each one indicate the existence of an edge.
+	Edges are uniquly represented as (a,b)-(c,d), where a <= c and b <= d.
+	Two valid edges are ordered as:
+		Index (a,b)-(c,d) < Index (a2,b2)-(c2,d2) iff one of next are valid:
+		- a < a2 
+		- a == a2 amd b < b2
+		- (a,b) == (a2,b2) and c < c2
+	
+	I.E., in a board of 2x2, edges are ordered:
+	[(0,0)-(0,1), (0,0)-(1,0), (0,1)-(0,2), (0,1)-(1,1), (1,0)-(1,1), (1,0)-(2,1), (1,1)-(1,2), (1,1)-(2,1)]
+	and their indexes are respectively 0, 1, ... , 2 * 2 * 2 - 1.
+	
+	Note that some of this edges won't be used, for example no edge which start in dot (1,1) can be selected. 
 	"""
 	def __init__(self, count_rows, count_cols):
 		self.count_rows = count_rows
@@ -22,7 +31,7 @@ class Board():
 	def __eq__(self):
 		_are_equal = self.count_rows == other_game_status.count_rows and self.count_cols == other_game_status.count_cols
 		
-		for _bit_izq, _bit_der in zip(self.board.get_ordered_taken_edges(), other_game_status.board.get_ordered_taken_edges()):
+		for _bit_izq, _bit_der in zip(self.board.get_ordered_edges_values(), other_game_status.board.get_ordered_edges_values()):
 			if not _are_equal and _bit_izq != _bit_der:
 				_are_equal = False
 				break
@@ -58,10 +67,10 @@ class Board():
 		return
 
 	def get_board_position(self, first_coordinate, second_coordinate):
-		_second_coordinate_is_on_right = first_coordinate[1] == second_coordinate[1] + 1
+		_share_row = first_coordinate[1] + 1 == second_coordinate[1]
 
-		position = first_coordinate[0] * self.count_cols + 2 * first_coordinate[1] # each node has two indexes in the board
-		position += 0 if _second_coordinate_is_on_right else 1 # bits are ordered as right and down edges respectively
+		position = 2 * (first_coordinate[0] * self.count_cols + first_coordinate[1]) # each coordinate has two bools in the board
+		position += 0 if _share_row else 1 # its bool for same row comes before the bool for same column
 
 		# only to check errors during development
 		for _coordinate in [first_coordinate, second_coordinate]:
@@ -79,7 +88,7 @@ class Board():
 			self.taken_edges[self.get_board_position(_first_coordinate, _second_coordinate)] = True
 		return
 
-	def get_ordered_taken_edges(self):
+	def get_ordered_edges_values(self):
 		"""
 		Yields a boolean for each edge indicating wether it is or not used.
 		Edges are traversed in right-down order in (0,0), (0,1), ... (last_row, last_col) order.
@@ -88,7 +97,7 @@ class Board():
 			yield _edge
 		return
 
-	def __get_all_edges(self):
+	def __get_edges_coordinates(self):
 		for _coordinate in itertools.product(range(self.count_rows-1), range(self.count_cols-1)): # inner edges
 			yield (_coordinate, (_coordinate[0] + 1, _coordinate[1]))
 			yield (_coordinate, (_coordinate[0], _coordinate[1] + 1))
@@ -97,37 +106,61 @@ class Board():
 			yield ((_row, self.count_cols - 1), (_row + 1, self.count_cols - 1))
 
 		for _col in range(self.count_rows-1): # last column
-			yield ((self.count_row - 1, _col), (self.count_cols - 1, _col + 1))
+			yield ((self.count_rows - 1, _col), (self.count_cols - 1, _col + 1))
 
 	def __rotate_coordinate(self, coordinate):
-		print(coordinate)
-		print((coordinate[1], (self.count_cols - 1 - coordinate[0])))
-		return (coordinate[1], (self.count_cols - 1 - coordinate[0]))
+		return (-coordinate[1] + self.count_rows - 1, coordinate[0])
 
 	def __rotate_edge(self, lft_coordinate, rgt_coordinate):
 		_next_lft_coordinate = self.__rotate_coordinate(lft_coordinate)
 		_next_rgt_coordinate = self.__rotate_coordinate(rgt_coordinate)
 
 		if _next_rgt_coordinate[0] < _next_lft_coordinate[0] or _next_rgt_coordinate[1] < _next_lft_coordinate[1]: # swap
-			_next_lft_coordinate = _next_rgt_coordinate
-			_next_rgt_coordinate = _next_lft_coordinate
+			_next_lft_coordinate, _next_rgt_coordinate = _next_rgt_coordinate, _next_lft_coordinate
 
 		return (_next_lft_coordinate, _next_rgt_coordinate)
 
 	def rotations(self):
 		yield self
+		yield self.reflect()
+
+		_prev_rotated_board  = self
 
 		for _ in range(3): # just rate
-			_rotate_board = self.clean_board()
+			_rotate_board = Board(self.count_rows, self.count_cols)
 			
-			for _actual_edge in self.__get_all_edges():
+			for _actual_edge in self.__get_edges_coordinates():
 				_rotated_edge = self.__rotate_edge(*_actual_edge)
-				print("original {} rotated {}".format(_actual_edge, _rotated_edge))
-				_rotate_board[self.get_board_position(*_rotated_edge)] = self.taken_edges[self.get_board_position(*_actual_edge)]
+				_rotate_board.taken_edges[self.get_board_position(*_rotated_edge)] = _prev_rotated_board.taken_edges[self.get_board_position(*_actual_edge)]
 
 			yield _rotate_board
-		
+			yield _rotate_board.reflect()
+
+			_prev_rotated_board = _rotate_board
+
 		return
+
+	def __reflect_coordinate(self, coordinate):
+		return (self.count_rows - 1 - coordinate[0], coordinate[1])
+
+	def __reflect_edge(self, lft_coordinate, rgt_coordinate):
+		_reflected_lft_coordinate = self.__reflect_coordinate(lft_coordinate)
+		_reflected_rgt_coordinate = self.__reflect_coordinate(rgt_coordinate)
+
+		if _reflected_rgt_coordinate[0] < _reflected_lft_coordinate[0] or _reflected_rgt_coordinate[1] < _reflected_lft_coordinate[1]: # swap if index rgt < index lft
+			_reflected_lft_coordinate, _reflected_rgt_coordinate = _reflected_rgt_coordinate, _reflected_lft_coordinate
+
+		return (_reflected_lft_coordinate, _reflected_rgt_coordinate)
+
+	def reflect(self):
+		_reflected_board = Board(self.count_rows, self.count_cols)
+		
+		for _edge in self.__get_edges_coordinates():
+			_reflected_edge = self.__reflect_edge(*_edge)
+			_reflected_board.taken_edges[self.get_board_position(*_reflected_edge)] = self.taken_edges[self.get_board_position(*_edge)]
+
+		return _reflected_board
+
 
 class BoardSaver():
 	def contains_board(self, board):
@@ -168,7 +201,7 @@ class BoardHashSaver(BoardSaver):
 		Parameters:
 		board (Board)
 		"""
-		equivalent_board = board # self.equivalent_board(board)
+		equivalent_board = self.equivalent_board(board)
 
 		if not self.contains_board(equivalent_board):  # only add it if it is new
 			self.boards[equivalent_board] = 0
@@ -194,7 +227,7 @@ class BoardTrieSaver(BoardSaver):
 		is_contained = True
 		root = self.bit_trie
 
-		for _taken_edge in board.get_ordered_taken_edges():
+		for _taken_edge in board.get_ordered_edges_values():
 			if _taken_edge in root.keys() and is_contained:
 				root = root[_taken_edge] # keep traversing the trie
 			else:
@@ -210,12 +243,12 @@ class BoardTrieSaver(BoardSaver):
 		Parameters:
 		board (Board)
 		"""
-		equivalent_board = board # self.equivalent_board(board)
+		equivalent_board = self.equivalent_board(board)
 
 		if not self.contains_board(equivalent_board): # only add it if it is new
 			root = self.bit_trie
 
-			for _taken_edge in board.get_ordered_taken_edges():
+			for _taken_edge in board.get_ordered_edges_values():
 				if _taken_edge not in root.keys():
 					root[_taken_edge] = {}
 				
@@ -261,6 +294,7 @@ class GameStatus():
 		"""
 		self.board.update_taken_edges(taken_edges)
 		return
+
 
 # example
 # s = BoardHashSaver()
