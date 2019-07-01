@@ -1,6 +1,7 @@
 import itertools
 
-class Board():
+
+class Board:
 	"""
 	Represent the board as an array of booleans where each one indicate the existence of an edge.
 	Edges are uniquly represented as (a,b)-(c,d), where a <= c and b <= d.
@@ -16,7 +17,7 @@ class Board():
 	
 	Note that some of this edges won't be used, for example no edge which start in dot (1,1) can be selected. 
 	"""
-	def __init__(self, count_rows, count_cols, taken_edges = []):
+	def __init__(self, count_rows, count_cols, taken_edges=()):
 		self.count_rows = count_rows
 		self.count_cols = count_cols
 		self.edges = self.clean_board()
@@ -26,7 +27,7 @@ class Board():
 	def __hash__(self):
 		mask = 0
 		for _ith, _bool in enumerate(self.edges):
-			mask &= _bool << _ith
+			mask |= _bool << _ith
 		return mask
 
 	def __eq__(self, other_board):
@@ -38,14 +39,13 @@ class Board():
 				_are_equal = _bit_izq == _bit_der
 				if not _are_equal:
 					break
-
 		return _are_equal
 
 	def clean_board(self):
 		"""
 		Return a new default board game representation with no taken edge.
 		"""
-		return [False] * self.count_cols * self.count_rows * 2
+		return [False for _ in range(self.count_cols * self.count_rows * 2)]
 
 	def __check_coordinate_bound(self, coordinate):
 		"""
@@ -144,7 +144,7 @@ class Board():
 		return
 
 	def __reflect_coordinate(self, coordinate):
-		return (self.count_rows - 1 - coordinate[0], coordinate[1])
+		return self.count_rows - 1 - coordinate[0], coordinate[1]
 
 	def __reflect_edge(self, lft_coordinate, rgt_coordinate):
 		_reflected_lft_coordinate = self.__reflect_coordinate(lft_coordinate)
@@ -168,42 +168,52 @@ class Board():
 		return [x for x in self.__get_edges_coordinates() if self.edges[self.get_board_position(*x)]]
 
 
-class BoardSaver():
-	def contains_board(self, board):
-		"""
-		Returns wheter the exactly board is contained.
-		"""
+class BoardSaver:
+	def __init__(self, size):
+		self.boards_size = size
+
+	def _add(self, board, value):
 		raise Exception()
-	
-	def add_board(self, board):
+
+	def _get(self, board):
 		raise Exception()
+
+	def _contains(self, board):
+		raise Exception
 	
-	def contains_equivalent_board(self, board):
+	def equivalent_board(self, state):
+		return Board(self.boards_size + 1, self.boards_size + 1, state)
+
+	def contains(self, state):
 		"""
 		Return whether any equivalent board is contained.
 		"""
-		for rotated_board in board.rotations():
-			if self.contains_board(rotated_board):
-				return True
-		
-		return False
+		return self._contains(self.equivalent_board(state))
 
-	def equivalent_board(self, board):
-		for rotated_board in board.rotations():
-			if self.contains_board(rotated_board):
-				return rotated_board
-		
-		return board
+	def get(self, state):
+		return self._get(self.equivalent_board(state))
+
+	def add(self, state, value):
+		"""
+		Add a board to the set.
+
+		Parameters:
+		board (Board)
+		"""
+		self._add(self.equivalent_board(state), value)
+		return
+
 
 class BoardHashSaver(BoardSaver):
 	"""
 	A bit trie set that stores all the boards so as to compare for existence quickly.
 	"""
-	def __init__(self):
+	def __init__(self, size):
+		super().__init__(size)
 		self.boards = {}
 		return
 
-	def contains_board(self, board):
+	def _contains(self, board):
 		"""
 		Parameters:
 		board (Board)
@@ -213,19 +223,27 @@ class BoardHashSaver(BoardSaver):
 		"""
 		return board in self.boards
 
-	def add_board(self, board):
+	def _add(self, board, value):
 		"""
 		Add a board to the set.
 
 		Parameters:
 		board (Board)
 		"""
-		if not self.contains_equivalent_board(board):  # only add it if it is new
-			self.boards[board] = 0
-		
+		self.boards[board] = value
+
 		return
 
+	def _get(self, board):
+		return self.boards[board]
+
+
 class BoardTrieSaver(BoardSaver):
+	class BoardTrieNode:
+		def __init__(self):
+			self.children = {}
+			self.value = None
+
 	"""
 	A bit trie set that stores all the boards so as to compare for existence quickly.
 	"""
@@ -253,7 +271,7 @@ class BoardTrieSaver(BoardSaver):
 
 		return is_contained
 
-	def add_board(self, board):
+	def add_board(self, board, value):
 		"""
 		Add a board to the set.
 
@@ -265,13 +283,15 @@ class BoardTrieSaver(BoardSaver):
 
 			for _taken_edge in board.get_ordered_edges_values():
 				if _taken_edge not in root.keys():
-					root[_taken_edge] = {}
+					root.children[_taken_edge] = BoardTrieSaver.BoardTrieNode()
 				
-				root = root[_taken_edge]
+				root = root.children[_taken_edge]
+			root.value = value
 
 		return
 
-class GameStatus():
+
+class GameStatus:
 	"""
 	Represent a status of a game: board, taken edges, players' points.
 

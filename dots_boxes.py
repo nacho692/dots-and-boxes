@@ -1,6 +1,7 @@
 import pygame
 import gym
 import itertools
+import random
 
 
 class DotsAndBoxes(gym.Env):
@@ -67,13 +68,15 @@ class DotsAndBoxes(gym.Env):
         'video.frames_per_second': 50
     }
 
-    def __init__(self, size=3):
+    def __init__(self, size=3, policy=None):
 
         self.n = (size + 1) * (size + 1)
         self.size = size
         self.nodes = []
         self.boxes = []
         self.done = False
+        self.action_spaces = set()
+        self.policy = policy
         self.reset()
 
         # Rendering variables
@@ -97,6 +100,38 @@ class DotsAndBoxes(gym.Env):
             done (bool): whether the episode has ended, in which case further step() calls will return undefined results
             info (dict): contains auxiliary diagnostic information (helpful for debugging, and sometimes learning)
         """
+        player_1_old_points = self._player_points(1)
+        player_2_old_points = self._player_points(2)
+
+        if not self._player_pick(1, action):
+            self._player2()
+
+        player_1_points = self._player_points(1)
+        player_2_points = self._player_points(2)
+        total_boxes = self.size * self.size
+        self.done = max(player_1_points, player_2_points) > total_boxes//2
+
+        reward = (player_1_points - player_1_old_points) - (player_2_points - player_2_old_points)
+
+        return self._get_current_observation(), reward, self.done, None
+
+    def _player2(self):
+        if self.policy is None:
+            while self._player_pick(2, random.sample(self.action_spaces, 1)[0]) and len(self.action_spaces) > 0:
+                pass
+            return
+        else:
+            new_point = True
+            while new_point and len(self.action_spaces) > 0:
+                state = self._get_current_observation()
+                if self.policy.contains(state):
+                    action = max(self.policy.get(self._get_current_observation()).items(), key=lambda x: x[1])[0]
+                else:
+                    action = random.sample(self.action_spaces, 1)[0]
+                new_point = self._player_pick(2, action)
+
+    def _player_pick(self, player, action):
+        old_player_points = self._player_points(player)
         assert not self.done
         pos_i = action[0]
         pos_j = action[1]
@@ -108,25 +143,23 @@ class DotsAndBoxes(gym.Env):
 
         assert not node_i.is_connected(node_j), "The edge already exists"
 
-        node_i.connect_to(node_j, 1)
+        node_i.connect_to(node_j, player)
+        if node_j.index > node_i.index:
+            self.action_spaces.remove((node_i.position, node_j.position))
+        else:
+            self.action_spaces.remove((node_j.position, node_i.position))
 
+        new_player_points = self._player_points(player)
+        return old_player_points < new_player_points
+
+    def _player_points(self, player):
+        return len(list(filter(lambda b: b.get_controller() == player, itertools.chain.from_iterable(self.boxes))))
+
+    def _get_current_observation(self):
         def get_edges(u):
             return map(lambda v: (u.position, v.position), filter(lambda v: v.index > u.index, u.connected_nodes))
 
-        observation = itertools.chain.from_iterable(map(get_edges, itertools.chain.from_iterable(self.nodes)))
-        player_1_points = list(filter(lambda b: b.get_controller() == 1, itertools.chain.from_iterable(self.boxes)))
-        player_2_points = list(filter(lambda b: b.get_controller() == 2, itertools.chain.from_iterable(self.boxes)))
-        total_boxes = self.size * self.size
-        self.done = abs(len(player_1_points) - len(player_2_points)) > \
-                    total_boxes - (len(player_1_points) + len(player_2_points))
-        reward = 0
-        if self.done:
-            if len(player_1_points) > len(player_2_points):
-                reward = 1
-            else:
-                reward = -1
-
-        return observation, reward, self.done, None
+        return list(itertools.chain.from_iterable(map(get_edges, itertools.chain.from_iterable(self.nodes))))
 
     def render(self, mode='human'):
 
@@ -177,6 +210,17 @@ class DotsAndBoxes(gym.Env):
                 self.boxes[i][j] = DotsAndBoxes.Box((i, j), corners)
 
         self.done = False
+        self.action_spaces = set()
+        for u in itertools.chain.from_iterable(self.nodes):
+            if u.position[1] < self.size:
+                self.action_spaces.add((u.position, (u.position[0], u.position[1] + 1)))
+            if u.position[0] < self.size:
+                self.action_spaces.add((u.position, (u.position[0] + 1, u.position[1])))
+
+        if random.choice([True, False]):
+            self._player2()
+
+        return self._get_current_observation()
 
     def _get_box_screen_position(self, pos):
         corner_position = self._get_node_screen_position(pos)
