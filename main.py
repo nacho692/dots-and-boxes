@@ -1,6 +1,6 @@
 import sys
 from learning_player import *
-from dots_boxes import DotsAndBoxes
+from dots_boxes import DotsAndBoxes, DotsAndBoxesMaxIfKnownPolicy
 import numpy as np
 import random
 import pickle
@@ -68,26 +68,26 @@ def q_learning(env, num_episodes, alpha, gamma=1.0, eps=1.0, eps_decay=.9999, ep
     return Q
 
 
-if not os.path.exists('policy_3x3.pickle'):
-    with open('policy_3x3.pickle', 'wb') as handle:
+if not os.path.exists('q_value_function_3x3.pickle'):
+    with open('q_value_function_3x3.pickle', 'wb') as handle:
         pickle.dump(BoardHashSaver(3), handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-with open('policy_3x3.pickle', 'rb') as handle:
-    policy = pickle.load(handle)
+with open('q_value_function_3x3.pickle', 'rb') as handle:
+    q_value_function = pickle.load(handle)
 
 for e in range(100):
     print(e)
-    with open('policy_3x3.pickle', 'rb') as handle:
-        training_policy = pickle.load(handle)
+    with open('q_value_function_3x3.pickle', 'rb') as handle:
+        training_q_value_function = pickle.load(handle)
 
-    env = DotsAndBoxes(3, training_policy)
-    policy = q_learning(env, 9999999, alpha=0.05, gamma=0.99, eps=0.2, epsmin=0.05, eps_decay=.9999995, Q=policy)
-    del training_policy
-    with open('policy_3x3.pickle', 'wb') as handle:
-        pickle.dump(policy, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    env = DotsAndBoxes(3, DotsAndBoxesMaxIfKnownPolicy(training_q_value_function))
+    q_value_function = q_learning(env, 9999999, alpha=0.05, gamma=0.99, eps=0.2, epsmin=0.05, eps_decay=.9999995, Q=q_value_function)
+    del training_q_value_function
+    with open('q_value_function_3x3.pickle', 'wb') as handle:
+        pickle.dump(q_value_function, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 inp = ""
-env = DotsAndBoxes(3, policy)
+env = DotsAndBoxes(3, DotsAndBoxesMaxIfKnownPolicy(q_value_function))
 env.render()
 while inp != "quit":
     inp = sys.stdin.readline()
