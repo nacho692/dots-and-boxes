@@ -125,7 +125,7 @@ class DotsAndBoxes(gym.Env):
             while new_point and len(self.action_spaces) > 0:
                 state = self._get_current_observation()
                 if self.policy.contains(state):
-                    action = max(self.policy.get(self._get_current_observation()).items(), key=lambda x: x[1])[0]
+                    action = max(self.policy.get(state).items(), key=lambda x: x[1])[0]
                 else:
                     action = random.sample(self.action_spaces, 1)[0]
                 new_point = self._player_pick(2, action)
@@ -153,11 +153,10 @@ class DotsAndBoxes(gym.Env):
         return old_player_points < new_player_points
 
     def _player_points(self, player):
-        return len(list(filter(lambda b: b.get_controller() == player, itertools.chain.from_iterable(self.boxes))))
+        return len([1 for b in itertools.chain.from_iterable(self.boxes) if b.get_controller() == player])
 
     def _get_current_observation(self):
-        def get_edges(u):
-            return map(lambda v: (u.position, v.position), filter(lambda v: v.index > u.index, u.connected_nodes))
+        get_edges = lambda u: ((u.position, v.position) for v in u.connected_nodes if v.index > u.index)
 
         return list(itertools.chain.from_iterable(map(get_edges, itertools.chain.from_iterable(self.nodes))))
 
