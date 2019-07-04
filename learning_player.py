@@ -1,5 +1,7 @@
-import itertools
+import bitstring as bs
 
+import itertools
+import math
 
 class Board:
 	"""
@@ -31,21 +33,15 @@ class Board:
 		return mask
 
 	def __eq__(self, other_board):
-		_are_equal = self.count_rows == other_board.count_rows and self.count_cols == other_board.count_cols
-		
-		if other_board:
-
-			for _bit_izq, _bit_der in zip(self.get_ordered_edges_values(), other_board.get_ordered_edges_values()):
-				_are_equal = _bit_izq == _bit_der
-				if not _are_equal:
-					break
-		return _are_equal
+		return self.count_rows == other_board.count_rows \
+			and self.count_cols == other_board.count_cols \
+			and self.edges == other_board.edges
 
 	def clean_board(self):
 		"""
 		Return a new default board game representation with no taken edge.
 		"""
-		return [False for _ in range(self.count_cols * self.count_rows * 2)]
+		return bs.BitArray(uint = 0, length = self.count_cols * self.count_rows * 2)
 
 	def __check_coordinate_bound(self, coordinate):
 		"""
@@ -88,7 +84,7 @@ class Board:
 		taken_edges :list: of edges, where and edge is a pair of coordinates and a coordinate a pair of int
 		"""
 		for (_first_coordinate, _second_coordinate) in taken_edges:
-			self.edges[self.get_board_position(_first_coordinate, _second_coordinate)] = True
+			self.edges[self.get_board_position(_first_coordinate, _second_coordinate)] = 1
 		return
 
 	def get_ordered_edges_values(self):
@@ -251,7 +247,17 @@ class BoardTrieSaver(BoardSaver):
 		self.bit_trie = {}
 		return
 
-	def contains_board(self, board):
+	def _get(self, board):
+		root = self.bit_trie
+		for _taken_edge in board.get_ordered_edges_values():
+			if _taken_edge not in root.keys():
+				root.children[_taken_edge] = BoardTrieSaver.BoardTrieNode()
+			
+			root = root.children[_taken_edge]
+		
+		return root.value
+
+	def _contains(self, board):
 		"""
 		Parameters:
 		board (Board)
@@ -271,7 +277,7 @@ class BoardTrieSaver(BoardSaver):
 
 		return is_contained
 
-	def add_board(self, board, value):
+	def _add(self, board, value):
 		"""
 		Add a board to the set.
 
