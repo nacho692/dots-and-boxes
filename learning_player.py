@@ -251,7 +251,17 @@ class BoardTrieSaver(BoardSaver):
 		self.bit_trie = {}
 		return
 
-	def contains_board(self, board):
+	def _get(self, board):
+		root = self.bit_trie
+		for _taken_edge in board.get_ordered_edges_values():
+			if _taken_edge not in root.keys():
+				root.children[_taken_edge] = BoardTrieSaver.BoardTrieNode()
+			
+			root = root.children[_taken_edge]
+		
+		return root.value
+
+	def _contains(self, board):
 		"""
 		Parameters:
 		board (Board)
@@ -271,7 +281,7 @@ class BoardTrieSaver(BoardSaver):
 
 		return is_contained
 
-	def add_board(self, board, value):
+	def _add(self, board, value):
 		"""
 		Add a board to the set.
 
