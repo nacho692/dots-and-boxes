@@ -4,6 +4,33 @@ import itertools
 import random
 
 
+class DotsAndBoxesPolicy:
+    def __init__(self, q_value_function):
+        self._q_value_function = q_value_function
+        return
+
+    def next_action(self, state, action_space):
+        raise NotImplementedError()
+
+class DotsAndBoxesRandomPolicy(DotsAndBoxesPolicy):
+    """
+    Returns a random choice of action space
+    """
+    def next_action(self, state, action_space):
+        return random.sample(action_space, 1)[0]
+
+class DotsAndBoxesMaxIfKnownPolicy(DotsAndBoxesPolicy):
+    """
+    Return an action with maximum reward if state is known.
+    Return a random action in other case.
+    """
+    def next_action(self, state, action_space):
+        if self._q_value_function.contains(state):
+            action = max(self._q_value_function.get(state).items(), key=lambda x: x[1])[0]
+        else:
+            action = random.sample(action_space, 1)[0]
+        return action
+
 class DotsAndBoxes(gym.Env):
     class Box:
         """
@@ -116,19 +143,11 @@ class DotsAndBoxes(gym.Env):
         return self._get_current_observation(), reward, self.done, None
 
     def _player2(self):
-        if self.policy is None:
-            while self._player_pick(2, random.sample(self.action_spaces, 1)[0]) and len(self.action_spaces) > 0:
-                pass
-            return
-        else:
-            new_point = True
-            while new_point and len(self.action_spaces) > 0:
-                state = self._get_current_observation()
-                if self.policy.contains(state):
-                    action = max(self.policy.get(self._get_current_observation()).items(), key=lambda x: x[1])[0]
-                else:
-                    action = random.sample(self.action_spaces, 1)[0]
-                new_point = self._player_pick(2, action)
+        new_point = True
+        while new_point and len(self.action_spaces) > 0:
+            state = self._get_current_observation()
+            action = self.policy.next_action(state, self.action_spaces)
+            new_point = self._player_pick(2, action)
 
     def _player_pick(self, player, action):
         old_player_points = self._player_points(player)
@@ -153,11 +172,10 @@ class DotsAndBoxes(gym.Env):
         return old_player_points < new_player_points
 
     def _player_points(self, player):
-        return len(list(filter(lambda b: b.get_controller() == player, itertools.chain.from_iterable(self.boxes))))
+        return len([1 for b in itertools.chain.from_iterable(self.boxes) if b.get_controller() == player])
 
     def _get_current_observation(self):
-        def get_edges(u):
-            return map(lambda v: (u.position, v.position), filter(lambda v: v.index > u.index, u.connected_nodes))
+        get_edges = lambda u: ((u.position, v.position) for v in u.connected_nodes if v.index > u.index)
 
         return list(itertools.chain.from_iterable(map(get_edges, itertools.chain.from_iterable(self.nodes))))
 
