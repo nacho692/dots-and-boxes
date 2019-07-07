@@ -12,12 +12,14 @@ class DotsAndBoxesPolicy:
     def next_action(self, state, action_space):
         raise NotImplementedError()
 
+
 class DotsAndBoxesRandomPolicy(DotsAndBoxesPolicy):
     """
     Returns a random choice of action space
     """
     def next_action(self, state, action_space):
         return random.sample(action_space, 1)[0]
+
 
 class DotsAndBoxesMaxIfKnownPolicy(DotsAndBoxesPolicy):
     """
@@ -26,10 +28,11 @@ class DotsAndBoxesMaxIfKnownPolicy(DotsAndBoxesPolicy):
     """
     def next_action(self, state, action_space):
         if self._q_value_function.contains(state):
-            action = max(self._q_value_function.get(state).items(), key=lambda x: x[1])[0]
+            action = max(action_space, key=lambda a: self._q_value_function.get(state, a))
         else:
             action = random.sample(action_space, 1)[0]
         return action
+
 
 class DotsAndBoxes(gym.Env):
     class Box:
@@ -136,9 +139,15 @@ class DotsAndBoxes(gym.Env):
         player_1_points = self._player_points(1)
         player_2_points = self._player_points(2)
         total_boxes = self.size * self.size
-        self.done = max(player_1_points, player_2_points) > total_boxes//2
+        self.done = max(player_1_points, player_2_points) > total_boxes//2 \
+                    or player_1_points + player_2_points == total_boxes
 
         reward = (player_1_points - player_1_old_points) - (player_2_points - player_2_old_points)
+        if self.done:
+            if player_1_points > player_2_points:
+                reward = total_boxes
+            else:
+                reward -= total_boxes
 
         return self._get_current_observation(), reward, self.done, None
 
