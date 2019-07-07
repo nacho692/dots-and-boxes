@@ -145,8 +145,8 @@ class DotsAndBoxes(gym.Env):
         reward = (player_1_points - player_1_old_points) - (player_2_points - player_2_old_points)
         if self.done:
             if player_1_points > player_2_points:
-                reward = total_boxes
-            else:
+                reward += total_boxes
+            elif player_1_points < player_2_points:
                 reward -= total_boxes
 
         return self._get_current_observation(), reward, self.done, None

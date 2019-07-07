@@ -5,7 +5,7 @@ import numpy as np
 import random
 import pickle
 import os.path
-
+import time
 
 def epsilon_greedy(Q, board, action_spaces, epsilon):
     if board is None:
@@ -67,8 +67,7 @@ def q_learning(env, num_episodes, alpha, gamma=1.0, eps=1.0, eps_decay=.9999, ep
             rw = 0
             if avg_rw > 1:
                 over_1k -= 1
-                if over_1k == 0:
-                    return Q
+
 
     return Q
 
@@ -88,7 +87,7 @@ for e in range(3):
         training_q_value_function = pickle.load(handle)
 
     env = DotsAndBoxes(2, DotsAndBoxesMaxIfKnownPolicy(training_q_value_function))
-    q_value_function = q_learning(env, 10000, alpha=0.05, gamma=0.95, eps=0.1, epsmin=0.01, eps_decay=.99995, Q=q_value_function)
+    q_value_function = q_learning(env, 100000, alpha=0.05, gamma=0.95, eps=0.1, epsmin=0.01, eps_decay=.999995, Q=q_value_function)
     del training_q_value_function
     with open('q_value_function_3x3.pickle', 'wb') as handle:
         pickle.dump(q_value_function, handle, protocol=pickle.HIGHEST_PROTOCOL)
