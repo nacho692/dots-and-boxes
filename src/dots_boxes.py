@@ -19,6 +19,7 @@ class DotsAndBoxesRandomPolicy(DotsAndBoxesPolicy):
     """
 
     def next_action(self, state, action_space):
+        print("ACCCTIOOONN ")
         return random.sample(action_space, 1)[0]
 
 
@@ -32,7 +33,7 @@ class DotsAndBoxesMaxIfKnownPolicy(DotsAndBoxesPolicy):
         if self._q_value_function.contains(state):
             action = max(action_space, key=lambda a: self._q_value_function.get(state, a))
         else:
-            action = random.sample(action_space, 1)[0]
+            action = random.sample(sorted(action_space), 1)[0]
         return action
 
 

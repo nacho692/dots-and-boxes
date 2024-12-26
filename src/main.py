@@ -35,7 +35,7 @@ def q_learning(
     Q: BoardSaver = None,
 ):
     if Q is None:
-        Q = BoardSaver(env.size + 1)
+        Q = BoardSaver(env.size)
     rw = 0
     new_boards = 0
     over_1k = 3
@@ -81,7 +81,7 @@ def q_learning(
             )
             new_boards = 0
             rw = 0
-            if avg_rw > 1:
+            if avg_rw > 10:
                 over_1k -= 1
                 if over_1k == 0:
                     return Q
@@ -89,30 +89,33 @@ def q_learning(
     return Q
 
 
-if not os.path.exists("q_value_function_3x3.pickle"):
-    with open("q_value_function_3x3.pickle", "wb") as handle:
-        pickle.dump(BoardSaver(3), handle, protocol=pickle.HIGHEST_PROTOCOL)
+board_size = 2
+q_file = f"q_value_function_{board_size}x{board_size}.pickle"
 
-with open("q_value_function_3x3.pickle", "rb") as handle:
+if not os.path.exists(q_file):
+    with open(q_file, "wb") as handle:
+        pickle.dump(BoardSaver(board_size), handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+with open(q_file, "rb") as handle:
     q_value_function = pickle.load(handle)
 
 print(len(q_value_function.boards))
 
-for e in range(10):
+for e in range(1):
     print(e)
-    with open("q_value_function_3x3.pickle", "rb") as handle:
+    with open(q_file, "rb") as handle:
         training_q_value_function = pickle.load(handle)
 
-    env = DotsAndBoxes(2, DotsAndBoxesMaxIfKnownPolicy(training_q_value_function))
+    env = DotsAndBoxes(board_size, DotsAndBoxesMaxIfKnownPolicy(training_q_value_function))
     q_value_function = q_learning(
-        env, 2000, alpha=0.05, gamma=0.95, eps=0.1, epsmin=0.01, eps_decay=0.999995, Q=q_value_function
+        env, 50_000, alpha=0.05, gamma=0.95, eps=0.1, epsmin=0.01, eps_decay=0.999995, Q=q_value_function
     )
     del training_q_value_function
-    with open("q_value_function_3x3.pickle", "wb") as handle:
+    with open(q_file, "wb") as handle:
         pickle.dump(q_value_function, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 inp = ""
-env = DotsAndBoxes(2, DotsAndBoxesMaxIfKnownPolicy(q_value_function))
+env = DotsAndBoxes(board_size, DotsAndBoxesMaxIfKnownPolicy(q_value_function))
 env.render()
 while inp != "quit":
     inp = sys.stdin.readline()
