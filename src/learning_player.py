@@ -1,6 +1,8 @@
 import bitstring as bitstring
 import itertools
 
+from dots_boxes import DotsAndBoxesState
+
 
 class Rotator:
 
@@ -229,27 +231,22 @@ class BoardSaver:
         _action = Action(self.rotator, action)
         return min(zip(_board.rotations(), _action.rotations()), key=lambda x: x[0].__hash__())
 
-    def contains(self, state):
+    def contains(self, state: DotsAndBoxesState):
         """
         Return whether any equivalent board is contained.
         """
-        _board = self._equivalent_board(state)
-        return _board in self.boards
+        _board = self._equivalent_board(state.state)
+        if _board not in self.boards:
+            return False
 
-    def _contains(self, state, action):
-        _board, _action = self._equivalent_board_action(state, action)
+        return state.player_points in self.boards[_board]
 
-        return _action in self.boards[_board]
+    def get(self, state: DotsAndBoxesState, action):
+        _board, _action = self._equivalent_board_action(state.state, action)
 
-    def get(self, state, action):
-        _board, _action = self._equivalent_board_action(state, action)
+        return self.boards[_board][state.player_points][_action]
 
-        return self.boards[_board][_action]
-
-    def _get(self, state):
-        return self.boards[self._equivalent_board(state)]
-
-    def define(self, state, action, value):
+    def define(self, state: DotsAndBoxesState, action, value):
         """
         Add a board to the set.
 
@@ -258,11 +255,14 @@ class BoardSaver:
         action
         value
         """
-        _board, _action = self._equivalent_board_action(state, action)
+        _board, _action = self._equivalent_board_action(state.state, action)
         if _board not in self.boards:
             self.boards[_board] = {}
 
-        self.boards[_board][_action] = value
+        if state.player_points not in self.boards[_board]:
+            self.boards[_board][state.player_points] = {}
+
+        self.boards[_board][state.player_points][_action] = value
         return
 
 

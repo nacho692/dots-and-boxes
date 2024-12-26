@@ -1,4 +1,5 @@
 from src.learning_player import BoardSaver, Rotator, Board
+from src.dots_boxes import DotsAndBoxesState
 
 
 class TestBoardSaver:
@@ -10,12 +11,15 @@ class TestBoardSaver:
         action_rotated = ((0, 1), (0, 2))
 
         bs = BoardSaver(size)
-        bs.define(state, action, 1)
+        bstate = DotsAndBoxesState(state, 0)
+        bs.define(bstate, action, 1)
 
-        assert bs.contains(state)
-        assert bs.contains(rotated_state)
-        assert bs.get(state, action) == 1
-        assert bs.get(rotated_state, action_rotated) == 1
+        rotated_bstate = DotsAndBoxesState(rotated_state, 0)
+
+        assert bs.contains(bstate)
+        assert bs.contains(rotated_bstate)
+        assert bs.get(bstate, action) == 1
+        assert bs.get(rotated_bstate, action_rotated) == 1
 
     def test_all_equivalent_boards(self):
         size = 2
@@ -41,10 +45,10 @@ class TestBoardSaver:
         ]
 
         bs = BoardSaver(size)
-        bs.define(state, action, 1)
+        bs.define(DotsAndBoxesState(state, 0), action, 1)
         for s, a in equivalent_states:
-            assert bs.contains(s)
-            assert bs.get(s, a) == 1
+            assert bs.contains(DotsAndBoxesState(s, 0))
+            assert bs.get(DotsAndBoxesState(s, 0), a) == 1
 
 
 class TestRotator:

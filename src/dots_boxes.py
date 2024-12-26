@@ -2,6 +2,7 @@ import pygame
 import gym
 import itertools
 import random
+from typing import NamedTuple
 
 
 class DotsAndBoxesPolicy:
@@ -19,8 +20,7 @@ class DotsAndBoxesRandomPolicy(DotsAndBoxesPolicy):
     """
 
     def next_action(self, state, action_space):
-        print("ACCCTIOOONN ")
-        return random.sample(action_space, 1)[0]
+        return random.sample(sorted(action_space), 1)[0]
 
 
 class DotsAndBoxesMaxIfKnownPolicy(DotsAndBoxesPolicy):
@@ -35,6 +35,20 @@ class DotsAndBoxesMaxIfKnownPolicy(DotsAndBoxesPolicy):
         else:
             action = random.sample(sorted(action_space), 1)[0]
         return action
+
+
+class DotsAndBoxesState(NamedTuple):
+    state: list
+    player_points: int
+
+    def __hash__(self):
+        return hash(tuple(self.state) + tuple(self.player_points))
+
+    def __eq__(self, other):
+        return self.state == other.state and self.player_points == other.player_points
+
+    def __str__(self):
+        return "State: {}, Action: {}".format(self.state, self.player_points)
 
 
 class DotsAndBoxes(gym.Env):
@@ -138,19 +152,33 @@ class DotsAndBoxes(gym.Env):
 
         player_1_points = self._player_points(1)
         player_2_points = self._player_points(2)
+
+        new_player_1_points = player_1_points - player_1_old_points
+        new_player_2_points = player_2_points - player_2_old_points
+
         total_boxes = self.size * self.size
         self.done = (
             max(player_1_points, player_2_points) > total_boxes // 2 or player_1_points + player_2_points == total_boxes
         )
 
-        reward = (player_1_points - player_1_old_points) - (player_2_points - player_2_old_points)
+        reward = new_player_1_points - new_player_2_points
+
         if self.done:
             if player_1_points > player_2_points:
                 reward += total_boxes
             elif player_1_points < player_2_points:
                 reward -= total_boxes
 
-        return self._get_current_observation(), reward, self.done, None
+        info = {
+            "player_1_points": player_1_points,
+            "player_2_points": player_2_points,
+            "new_player_1_points": new_player_1_points,
+            "new_player_2_points": new_player_2_points,
+            "reward": reward,
+            "done": self.done,
+        }
+
+        return self._get_current_observation(), info
 
     def _player2(self):
         new_point = True
@@ -188,7 +216,10 @@ class DotsAndBoxes(gym.Env):
         def get_edges(u):
             return ((u.position, v.position) for v in u.connected_nodes if v.index > u.index)
 
-        return list(itertools.chain.from_iterable(map(get_edges, itertools.chain.from_iterable(self.nodes))))
+        return DotsAndBoxesState(
+            state=list(itertools.chain.from_iterable(map(get_edges, itertools.chain.from_iterable(self.nodes)))),
+            player_points=self._player_points(1),
+        )
 
     def render(self, mode="human"):
 
