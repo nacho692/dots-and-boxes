@@ -17,6 +17,7 @@ class DotsAndBoxesRandomPolicy(DotsAndBoxesPolicy):
     """
     Returns a random choice of action space
     """
+
     def next_action(self, state, action_space):
         return random.sample(action_space, 1)[0]
 
@@ -26,6 +27,7 @@ class DotsAndBoxesMaxIfKnownPolicy(DotsAndBoxesPolicy):
     Return an action with maximum reward if state is known.
     Return a random action in other case.
     """
+
     def next_action(self, state, action_space):
         if self._q_value_function.contains(state):
             action = max(action_space, key=lambda a: self._q_value_function.get(state, a))
@@ -93,12 +95,9 @@ class DotsAndBoxes(gym.Env):
         def __str__(self):
             return str(self.position)
 
-    metadata = {
-        'render.modes': ['human', 'rgb_array'],
-        'video.frames_per_second': 50
-    }
+    metadata = {"render.modes": ["human", "rgb_array"], "video.frames_per_second": 50}
 
-    def __init__(self, size=3, policy=None):
+    def __init__(self, size=3, policy: DotsAndBoxesPolicy | None = None):
 
         self.n = (size + 1) * (size + 1)
         self.size = size
@@ -119,7 +118,7 @@ class DotsAndBoxes(gym.Env):
         self.box_step = self.display_size // self.size
 
     def step(self, action):
-        """ Executes a selected action
+        """Executes a selected action
 
         Args:
             action: A tuple of positions. A position is a tuple indicating the node by position, (x, y) indicating
@@ -139,8 +138,9 @@ class DotsAndBoxes(gym.Env):
         player_1_points = self._player_points(1)
         player_2_points = self._player_points(2)
         total_boxes = self.size * self.size
-        self.done = max(player_1_points, player_2_points) > total_boxes//2 \
-                    or player_1_points + player_2_points == total_boxes
+        self.done = (
+            max(player_1_points, player_2_points) > total_boxes // 2 or player_1_points + player_2_points == total_boxes
+        )
 
         reward = (player_1_points - player_1_old_points) - (player_2_points - player_2_old_points)
         if self.done:
@@ -184,11 +184,12 @@ class DotsAndBoxes(gym.Env):
         return len([1 for b in itertools.chain.from_iterable(self.boxes) if b.get_controller() == player])
 
     def _get_current_observation(self):
-        get_edges = lambda u: ((u.position, v.position) for v in u.connected_nodes if v.index > u.index)
+        def get_edges(u):
+            return ((u.position, v.position) for v in u.connected_nodes if v.index > u.index)
 
         return list(itertools.chain.from_iterable(map(get_edges, itertools.chain.from_iterable(self.nodes))))
 
-    def render(self, mode='human'):
+    def render(self, mode="human"):
 
         # PyGame screen
         BLACK = (0, 0, 0)
@@ -200,7 +201,7 @@ class DotsAndBoxes(gym.Env):
             pygame.init()
             pygame.font.init()
             self.screen = pygame.display.set_mode((self.screen_width, self.screen_height), 0, 32)
-            self.font = pygame.font.Font('freesansbold.ttf', 16)
+            self.font = pygame.font.Font("freesansbold.ttf", 16)
             pygame.display.set_caption("Markov Dots and Boxes")
 
         self.screen.fill(BLACK)
@@ -214,7 +215,7 @@ class DotsAndBoxes(gym.Env):
                 pygame.draw.line(self.screen, GREEN, n_s_pos, on_s_pos, width=1)
 
             pygame.draw.circle(self.screen, RED, n_s_pos, 5, width=5)
-            text = self.font.render('({},{})'.format(node.position[0], node.position[1]), True, WHITE, BLACK)
+            text = self.font.render("({},{})".format(node.position[0], node.position[1]), True, WHITE, BLACK)
             self.screen.blit(text, (n_s_pos[0] - 16, n_s_pos[1] + 10))
 
         for box in itertools.chain.from_iterable(self.boxes):
@@ -224,8 +225,9 @@ class DotsAndBoxes(gym.Env):
         pygame.display.update()
 
     def reset(self):
-        self.nodes = [[DotsAndBoxes.Node((i, j), i + j * self.size) for j in range(self.size + 1)]
-                      for i in range(self.size + 1)]
+        self.nodes = [
+            [DotsAndBoxes.Node((i, j), i + j * self.size) for j in range(self.size + 1)] for i in range(self.size + 1)
+        ]
         self.boxes = [[None for _ in range(self.size)] for _ in range(self.size)]
         for i in range(self.size):
             for j in range(self.size):
@@ -258,8 +260,10 @@ class DotsAndBoxes(gym.Env):
     def _get_node_screen_position(self, pos):
         i, j = pos
 
-        starting_point = (self.screen_width // 2 - self.display_size // 2,
-                          self.screen_height // 2 - self.display_size // 2)
+        starting_point = (
+            self.screen_width // 2 - self.display_size // 2,
+            self.screen_height // 2 - self.display_size // 2,
+        )
         dot_position = (starting_point[0] + i * self.box_step, starting_point[1] + j * self.box_step)
 
         return dot_position

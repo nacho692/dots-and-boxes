@@ -15,8 +15,10 @@ class Rotator:
         _reflected_lft_coordinate = self.__reflect_coordinate(lft_coordinate)
         _reflected_rgt_coordinate = self.__reflect_coordinate(rgt_coordinate)
 
-        if _reflected_rgt_coordinate[0] < _reflected_lft_coordinate[0] \
-                or _reflected_rgt_coordinate[1] < _reflected_lft_coordinate[1]:  # swap if index rgt < index lft
+        if (
+            _reflected_rgt_coordinate[0] < _reflected_lft_coordinate[0]
+            or _reflected_rgt_coordinate[1] < _reflected_lft_coordinate[1]
+        ):  # swap if index rgt < index lft
             _reflected_lft_coordinate, _reflected_rgt_coordinate = _reflected_rgt_coordinate, _reflected_lft_coordinate
 
         return _reflected_lft_coordinate, _reflected_rgt_coordinate
@@ -29,30 +31,29 @@ class Rotator:
         _next_lft_coordinate = self.rotate_coordinate(lft_coordinate)
         _next_rgt_coordinate = self.rotate_coordinate(rgt_coordinate)
 
-        if _next_rgt_coordinate[0] < _next_lft_coordinate[0] or _next_rgt_coordinate[1] < _next_lft_coordinate[
-            1]:  # swap
+        if (
+            _next_rgt_coordinate[0] < _next_lft_coordinate[0] or _next_rgt_coordinate[1] < _next_lft_coordinate[1]
+        ):  # swap
             _next_lft_coordinate, _next_rgt_coordinate = _next_rgt_coordinate, _next_lft_coordinate
 
         return _next_lft_coordinate, _next_rgt_coordinate
 
 
 class Board:
-
     """
     Represent the board as an array of booleans where each one indicate the existence of an edge.
     Edges are uniquly represented as (a,b)-(c,d), where a <= c and b <= d.
     Two valid edges are ordered as:
         Index (a,b)-(c,d) < Index (a2,b2)-(c2,d2) iff one of next are valid:
-        - a < a2 
+        - a < a2
         - a == a2 amd b < b2
         - (a,b) == (a2,b2) and c < c2
-    
     I.E., in a board of 2x2, edges are ordered:
     [(0,0)-(0,1), (0,0)-(1,0), (0,1)-(0,2), (0,1)-(1,1), (1,0)-(1,1), (1,0)-(2,1), (1,1)-(1,2), (1,1)-(2,1)]
     and their indexes are respectively 0, 1, ... , 2 * 2 * 2 - 1.
-    
-    Note that some of this edges won't be used, for example no edge which start in dot (1,1) can be selected. 
+    Note that some of this edges won't be used, for example no edge which start in dot (1,1) can be selected.
     """
+
     def __init__(self, rotator, size, taken_edges=()):
         self.size = size
         self.edges = self.clean_board()
@@ -67,8 +68,7 @@ class Board:
         return mask
 
     def __eq__(self, other_board):
-        return self.size == other_board.size \
-               and self.edges == other_board.edges
+        return self.size == other_board.size and self.edges == other_board.edges
 
     def clean_board(self):
         """
@@ -89,20 +89,32 @@ class Board:
         Check there is an edge between coordinates
         """
         if first_coordinate == second_coordinate:
-            raise Exception("first_coordinate {} equals second_coordinate {}".format(first_coordinate, second_coordinate))
+            raise Exception(
+                "first_coordinate {} equals second_coordinate {}".format(first_coordinate, second_coordinate)
+            )
 
         if second_coordinate[0] < first_coordinate[0] or second_coordinate[1] < first_coordinate[1]:
-            raise Exception("first_coordinate {} is not on top or left of second_coordinate {}".format(first_coordinate, second_coordinate))
+            raise Exception(
+                "first_coordinate {} is not on top or left of second_coordinate {}".format(
+                    first_coordinate, second_coordinate
+                )
+            )
 
-        if first_coordinate[0] not in range(second_coordinate[0] - 1, second_coordinate[0] + 1) or first_coordinate[1] not in range(second_coordinate[1] - 1, second_coordinate[1] + 1):
-            raise Exception("first_coordinate {} is contiguous to second_coordinate {}".format(first_coordinate, second_coordinate))
+        if first_coordinate[0] not in range(second_coordinate[0] - 1, second_coordinate[0] + 1) or first_coordinate[
+            1
+        ] not in range(second_coordinate[1] - 1, second_coordinate[1] + 1):
+            raise Exception(
+                "first_coordinate {} is contiguous to second_coordinate {}".format(first_coordinate, second_coordinate)
+            )
         return
 
     def get_board_position(self, first_coordinate, second_coordinate):
         _share_row = first_coordinate[1] + 1 == second_coordinate[1]
 
-        position = 2 * (first_coordinate[0] * self.size + first_coordinate[1]) # each coordinate has two bools in the board
-        position += 0 if _share_row else 1 # its bool for same row comes before the bool for same column
+        position = 2 * (
+            first_coordinate[0] * self.size + first_coordinate[1]
+        )  # each coordinate has two bools in the board
+        position += 0 if _share_row else 1  # its bool for same row comes before the bool for same column
 
         # only to check errors during development
         for _coordinate in [first_coordinate, second_coordinate]:
@@ -116,19 +128,19 @@ class Board:
         """
         taken_edges :list: of edges, where and edge is a pair of coordinates and a coordinate a pair of int
         """
-        for (_first_coordinate, _second_coordinate) in taken_edges:
+        for _first_coordinate, _second_coordinate in taken_edges:
             self.edges[self.get_board_position(_first_coordinate, _second_coordinate)] = 1
         return
 
     def __get_edges_coordinates(self):
-        for _coordinate in itertools.product(range(self.size-1), range(self.size-1)): # inner edges
+        for _coordinate in itertools.product(range(self.size - 1), range(self.size - 1)):  # inner edges
             yield (_coordinate, (_coordinate[0] + 1, _coordinate[1]))
             yield (_coordinate, (_coordinate[0], _coordinate[1] + 1))
 
         for _row in range(self.size - 1):  # last row
             yield ((_row, self.size - 1), (_row + 1, self.size - 1))
 
-        for _col in range(self.size-1):  # last column
+        for _col in range(self.size - 1):  # last column
             yield ((self.size - 1, _col), (self.size - 1, _col + 1))
 
     def rotations(self):
@@ -142,7 +154,9 @@ class Board:
 
             for _actual_edge in self.__get_edges_coordinates():
                 _rotated_edge = self.rotator.rotate_edge(_actual_edge)
-                _rotate_board.edges[self.get_board_position(*_rotated_edge)] = _prev_rotated_board.edges[self.get_board_position(*_actual_edge)]
+                _rotate_board.edges[self.get_board_position(*_rotated_edge)] = _prev_rotated_board.edges[
+                    self.get_board_position(*_actual_edge)
+                ]
 
             yield _rotate_board
             yield _rotate_board.reflect()
@@ -156,7 +170,9 @@ class Board:
 
         for _edge in self.__get_edges_coordinates():
             _reflected_edge = self.rotator.reflect_edge(_edge)
-            _reflected_board.edges[self.get_board_position(*_reflected_edge)] = self.edges[self.get_board_position(*_edge)]
+            _reflected_board.edges[self.get_board_position(*_reflected_edge)] = self.edges[
+                self.get_board_position(*_edge)
+            ]
 
         return _reflected_board
 
@@ -175,8 +191,7 @@ class Action:
 
     def __eq__(self, other_action):
         inverted = (self.edge[1], self.edge[0])
-        return self.edge == other_action.edge \
-               or inverted == other_action.edge
+        return self.edge == other_action.edge or inverted == other_action.edge
 
     def reflect(self):
         return Action(self.rotator, self.rotator.reflect_edge(self.edge))
@@ -263,4 +278,3 @@ if __name__ == "__main__":
     assert bs.contains(list_of_tuples)
     assert bs.get(list_of_tuples, action) == 1
     assert bs.get(list_of_tuples_rotated, action_rotated) == 1
-
