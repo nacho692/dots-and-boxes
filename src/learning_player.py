@@ -1,7 +1,7 @@
 import bitstring as bitstring
 import itertools
 
-from dots_boxes import DotsAndBoxesState
+from .dots_boxes import DotsAndBoxesState
 
 
 class Rotator:
@@ -230,6 +230,11 @@ class BoardSaver:
         _board = Board(self.rotator, self.size, state)
         _action = Action(self.rotator, action)
         return min(zip(_board.rotations(), _action.rotations()), key=lambda x: x[0].__hash__())
+
+    def copy(self):
+        saver = BoardSaver(self.size)
+        saver.boards = dict(self.boards)
+        return saver
 
     def contains(self, state: DotsAndBoxesState):
         """
