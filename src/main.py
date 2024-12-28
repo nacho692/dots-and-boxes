@@ -5,7 +5,14 @@ import pickle
 import os.path
 
 from learning_player import BoardSaver
-from dots_boxes import DotsAndBoxes, DotsAndBoxesMaxIfKnownPolicy, DotsAndBoxesRandomPolicy, DotsAndBoxesState
+from dots_boxes import (
+    DotsAndBoxes,
+    DotsAndBoxesMaxIfKnownPolicy,
+    DotsAndBoxesRandomPolicy,
+    DotsAndBoxesState,
+    DotsAndBoxesCloseBoxesPolicy,
+)
+import logging
 
 random.seed(0)
 
@@ -80,7 +87,7 @@ def q_learning(
         if e % 100 == 0:
             avg_rw = rw / 100
             avg_won = won / 100
-            print(
+            logging.info(
                 "episode: {}, reward rate: {}, new states: {}, epsilon: {}, avg_won: {}".format(
                     e, avg_rw, new_states, eps, avg_won
                 )
@@ -92,46 +99,70 @@ def q_learning(
     return Q
 
 
-board_size = 2
-q_file = f"q_value_function_{board_size}x{board_size}.pickle"
+def play_against_player(board_size, q_value_function):
+    inp = ""
+    env = DotsAndBoxes(board_size, DotsAndBoxesMaxIfKnownPolicy(q_value_function))
+    env.render()
+    while inp != "quit":
+        inp = sys.stdin.readline()
 
-if not os.path.exists(q_file):
-    with open(q_file, "wb") as handle:
-        pickle.dump(BoardSaver(board_size), handle, protocol=pickle.HIGHEST_PROTOCOL)
+        def splitter(n):
+            node = list(map(int, n.split(",")))
+            return node[0], node[1]
 
-with open(q_file, "rb") as handle:
-    q_value_function = pickle.load(handle)
+        action = list(map(splitter, inp.split(" ")))
+        observation, info = env.step(action)
+        done = info.get("done")
 
-print(len(q_value_function.boards))
+        env.render()
+        if done:
+            env.reset()
+            env.render()
 
-for e in range(1):
-    print(e)
-    with open(q_file, "rb") as handle:
-        training_q_value_function = pickle.load(handle)
 
-    env = DotsAndBoxes(board_size, DotsAndBoxesRandomPolicy(training_q_value_function))
-    q_value_function = q_learning(
-        env, 50_000, alpha=0.05, gamma=0.95, eps=0.1, epsmin=0.01, eps_decay=0.999995, Q=q_value_function
-    )
-    del training_q_value_function
+def save_q(q_file, q_value_function: BoardSaver):
     with open(q_file, "wb") as handle:
         pickle.dump(q_value_function, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-# inp = ""
-# env = DotsAndBoxes(board_size, DotsAndBoxesMaxIfKnownPolicy(q_value_function))
-# env.render()
-# while inp != "quit":
-#     inp = sys.stdin.readline()
 
-#     def splitter(n):
-#         node = list(map(int, n.split(",")))
-#         return node[0], node[1]
+def load_q(q_file) -> BoardSaver:
+    with open(q_file, "rb") as handle:
+        training_q_value_function = pickle.load(handle)
+    return training_q_value_function
 
-#     action = list(map(splitter, inp.split(" ")))
-#     observation, info = env.step(action)
-#     done = info.get("done")
 
-#     env.render()
-#     if done:
-#         env.reset()
-#         env.render()
+def train(board_size, q_file, q_value_function):
+    for e in range(100):
+        logging.info(e)
+        training_q_value_function = load_q(q_file)
+
+        env = DotsAndBoxes(board_size, DotsAndBoxesCloseBoxesPolicy(training_q_value_function))
+        q_value_function = q_learning(
+            env, 2_000, alpha=0.05, gamma=0.95, eps=0.1, epsmin=0.01, eps_decay=0.999995, Q=q_value_function
+        )
+        del training_q_value_function
+        save_q(q_file, q_value_function)
+    return q_value_function
+
+
+if __name__ == "__main__":
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    board_size = 3
+    q_file = f"q_value_function_{board_size}x{board_size}.pickle"
+
+    if not os.path.exists(q_file):
+        with open(q_file, "wb") as handle:
+            pickle.dump(BoardSaver(board_size), handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    q_value_function = load_q(q_file)
+    logging.info(len(q_value_function.boards))
+
+    train(board_size, q_file, q_value_function)
+
+    # play_against_player(board_size, q_value_function)
