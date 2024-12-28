@@ -8,17 +8,38 @@ from typing import NamedTuple
 class DotsAndBoxesPolicy:
     def __init__(self, q_value_function):
         self._q_value_function = q_value_function
-        return
 
     def next_action(self, state, action_space):
         raise NotImplementedError()
+
+
+class DotsAndBoxesCloseBoxesPolicy(DotsAndBoxesPolicy):
+    """
+    Closes a box if possible, if not, returns a random choice of action space
+    """
+
+    def next_action(self, state, action_space):
+        max_width = max(map(lambda x: x[1][1], action_space))
+        max_height = max(map(lambda x: x[1][0], action_space))
+        for i in range(max_height):
+            for j in range(max_width):
+                borders = [
+                    ((i, j), (i, j + 1)),
+                    ((i, j), (i + 1, j)),
+                    ((i + 1, j), (i + 1, j + 1)),
+                    ((i, j + 1), (i + 1, j + 1)),
+                ]
+                # If there is a box with 3 sides closed, close the last one
+                if sum(1 for b in borders if b not in action_space) == 3:
+                    return next(b for b in borders if b in action_space)
+
+        return random.sample(sorted(action_space), 1)[0]
 
 
 class DotsAndBoxesRandomPolicy(DotsAndBoxesPolicy):
     """
     Returns a random choice of action space
     """
-
     def next_action(self, state, action_space):
         return random.sample(sorted(action_space), 1)[0]
 
@@ -51,7 +72,6 @@ class DotsAndBoxesMaxIfKnownPolicy(DotsAndBoxesPolicy):
     Return an action with maximum reward if state is known.
     Return a random action in other case.
     """
-
     def next_action(self, state, action_space):
         if self._q_value_function.contains(state):
             action = max(action_space, key=lambda a: self._q_value_function.get(state, a))
@@ -59,6 +79,25 @@ class DotsAndBoxesMaxIfKnownPolicy(DotsAndBoxesPolicy):
             action = random.sample(sorted(action_space), 1)[0]
         return action
 
+class DotsAndBoxesMixerPolicy(DotsAndBoxesPolicy):
+    """
+    Return an action with maximum reward if state is known.
+    Return a random action in other case.
+    """
+    def __init__(self, q_value_function):
+        super().__init__(q_value_function)
+        self._greedy = DotsAndBoxesCloseBoxesPolicy(q_value_function=q_value_function)
+
+    def next_action(self, state, action_space):
+        
+        if self._q_value_function.contains(state):
+            action = max(action_space, key=lambda a: self._q_value_function.get(state, a))
+        else:
+            action = self._greedy.next_action(state, action_space)
+        return action
+
+    def update_q_value_function(self, q_value_function):
+        self._q_value_function = q_value_function
 
 class DotsAndBoxesState(NamedTuple):
     state: list
@@ -154,6 +193,11 @@ class DotsAndBoxes(gym.Env):
         self.margin_size = 40
         self.display_size = min(self.screen_height - self.margin_size * 2, self.screen_width - self.margin_size * 2)
         self.box_step = self.display_size // self.size
+
+
+    def update_q_value_function(self, q_value_function):
+        static_value = q_value_function.copy()
+        #self.policy.update_q_value_function(q_value_function)
 
     def step(self, action):
         """Executes a selected action
@@ -258,8 +302,12 @@ class DotsAndBoxes(gym.Env):
             self.screen = pygame.display.set_mode((self.screen_width, self.screen_height), 0, 32)
             self.font = pygame.font.Font("freesansbold.ttf", 16)
             pygame.display.set_caption("Markov Dots and Boxes")
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                run = False
 
         self.screen.fill(BLACK)
+
 
         for node in itertools.chain.from_iterable(self.nodes):
             n_s_pos = self._get_node_screen_position(node.position)
@@ -276,7 +324,6 @@ class DotsAndBoxes(gym.Env):
         for box in itertools.chain.from_iterable(self.boxes):
             text = self.font.render(str(box.get_controller()), True, WHITE, BLACK)
             self.screen.blit(text, self._get_box_screen_position(box.position))
-
         pygame.display.update()
 
     def reset(self):
