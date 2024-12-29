@@ -42,7 +42,7 @@ def q_learning(
         if e % 100 == 0:
             avg_rw = rw / 100
             avg_won = won / 100
-            average_new_states = sum((key*value for key, value in amount_of_states.items())) / sum(amount_of_states.values())
+            average_new_states = sum((key*value for key, value in amount_of_states.items())) / sum(amount_of_states.values()) if sum(amount_of_states.values()) != 0 else 0
             average_amount_of_turns = sum((key*value for key, value in amount_of_turns.items())) / sum(amount_of_turns.values())
             logging.info(
                 f"episode: {e}, reward rate: {avg_rw:.2f}, avg_won: {avg_won:.2%}. avg_new_states {average_new_states:.2f}. avg_aot {average_amount_of_turns:.2f}"
