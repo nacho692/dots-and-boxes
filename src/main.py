@@ -43,7 +43,7 @@ def q_learning(
             #average_new_states = sum((key*value for key, value in new_states.items())) / sum(new_states.values())
             average_amount_of_turns = sum((key*value for key, value in amount_of_turns.items())) / sum(amount_of_turns.values())
             logging.info(
-                f"episode: {e}, reward rate: {avg_rw:.2f}, avg_won: {avg_won:.2%}. avg_pd_aot {average_amount_of_turns:.2%}"
+                f"episode: {e}, reward rate: {avg_rw:.2f}, avg_won: {avg_won:.2%}. avg_pd_aot {average_amount_of_turns:.2f}"
             )
             
             
