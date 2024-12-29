@@ -1,0 +1,1 @@
+from .policies import DotsAndBoxesCloseBoxesPolicy, DotsAndBoxesMixerPolicy, DotsAndBoxesMaxIfKnownPolicy, DotsAndBoxesRandomPolicy, DotsAndBoxesPolicy

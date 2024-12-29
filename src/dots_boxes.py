@@ -1,103 +1,9 @@
-import pygame
 import gym
-import itertools
+import pygame
 import random
+import itertools
 from typing import NamedTuple
-
-
-class DotsAndBoxesPolicy:
-    def __init__(self, q_value_function):
-        self._q_value_function = q_value_function
-
-    def next_action(self, state, action_space):
-        raise NotImplementedError()
-
-
-class DotsAndBoxesCloseBoxesPolicy(DotsAndBoxesPolicy):
-    """
-    Closes a box if possible, if not, returns a random choice of action space
-    """
-
-    def next_action(self, state, action_space):
-        max_width = max(map(lambda x: x[1][1], action_space))
-        max_height = max(map(lambda x: x[1][0], action_space))
-        for i in range(max_height):
-            for j in range(max_width):
-                borders = [
-                    ((i, j), (i, j + 1)),
-                    ((i, j), (i + 1, j)),
-                    ((i + 1, j), (i + 1, j + 1)),
-                    ((i, j + 1), (i + 1, j + 1)),
-                ]
-                # If there is a box with 3 sides closed, close the last one
-                if sum(1 for b in borders if b not in action_space) == 3:
-                    return next(b for b in borders if b in action_space)
-
-        return random.sample(sorted(action_space), 1)[0]
-
-
-class DotsAndBoxesRandomPolicy(DotsAndBoxesPolicy):
-    """
-    Returns a random choice of action space
-    """
-    def next_action(self, state, action_space):
-        return random.sample(sorted(action_space), 1)[0]
-
-
-class DotsAndBoxesCloseBoxesPolicy(DotsAndBoxesPolicy):
-    """
-    Closes a box if possible, if not, returns a random choice of action space
-    """
-
-    def next_action(self, state, action_space):
-        max_width = max(map(lambda x: x[1][1], action_space))
-        max_height = max(map(lambda x: x[1][0], action_space))
-        for i in range(max_height):
-            for j in range(max_width):
-                borders = [
-                    ((i, j), (i, j + 1)),
-                    ((i, j), (i + 1, j)),
-                    ((i + 1, j), (i + 1, j + 1)),
-                    ((i, j + 1), (i + 1, j + 1)),
-                ]
-                # If there is a box with 3 sides closed, close the last one
-                if sum(1 for b in borders if b not in action_space) == 3:
-                    return next(b for b in borders if b in action_space)
-
-        return random.sample(sorted(action_space), 1)[0]
-
-
-class DotsAndBoxesMaxIfKnownPolicy(DotsAndBoxesPolicy):
-    """
-    Return an action with maximum reward if state is known.
-    Return a random action in other case.
-    """
-    def next_action(self, state, action_space):
-        if self._q_value_function.contains(state):
-            action = max(action_space, key=lambda a: self._q_value_function.get(state, a))
-        else:
-            action = random.sample(sorted(action_space), 1)[0]
-        return action
-
-class DotsAndBoxesMixerPolicy(DotsAndBoxesPolicy):
-    """
-    Return an action with maximum reward if state is known.
-    Return a random action in other case.
-    """
-    def __init__(self, q_value_function):
-        super().__init__(q_value_function)
-        self._greedy = DotsAndBoxesCloseBoxesPolicy(q_value_function=q_value_function)
-
-    def next_action(self, state, action_space):
-        
-        if self._q_value_function.contains(state):
-            action = max(action_space, key=lambda a: self._q_value_function.get(state, a))
-        else:
-            action = self._greedy.next_action(state, action_space)
-        return action
-
-    def update_q_value_function(self, q_value_function):
-        self._q_value_function = q_value_function
+from .constants import PLAYER_1, PLAYER_2
 
 class DotsAndBoxesState(NamedTuple):
     state: list
@@ -174,7 +80,7 @@ class DotsAndBoxes(gym.Env):
 
     metadata = {"render.modes": ["human", "rgb_array"], "video.frames_per_second": 50}
 
-    def __init__(self, size=3, policy: DotsAndBoxesPolicy | None = None):
+    def __init__(self, size=3):
 
         self.n = (size + 1) * (size + 1)
         self.size = size
@@ -182,7 +88,6 @@ class DotsAndBoxes(gym.Env):
         self.boxes = []
         self.done = False
         self.action_spaces = set()
-        self.policy = policy
         self.reset()
 
         # Rendering variables
@@ -195,9 +100,6 @@ class DotsAndBoxes(gym.Env):
         self.box_step = self.display_size // self.size
 
 
-    def update_q_value_function(self, q_value_function):
-        static_value = q_value_function.copy()
-        #self.policy.update_q_value_function(q_value_function)
 
     def step(self, action):
         """Executes a selected action
@@ -208,17 +110,17 @@ class DotsAndBoxes(gym.Env):
         Returns:
             observation (object): Agent's observation of the current environment.
             reward (float) : amount of reward returned after previous action
-            done (bool): whether the episode has ended, in which case further step() calls will return undefined results
+            terminated (bool): whether the episode has ended, If this happens the user needs  to call reset() to use a new env
+            truncated (bool): Whether the truncation condition outside the scope of the MDP is satisfied. 
             info (dict): contains auxiliary diagnostic information (helpful for debugging, and sometimes learning)
         """
-        player_1_old_points = self._player_points(1)
-        player_2_old_points = self._player_points(2)
+        player_1_old_points = self._player_points(PLAYER_1)
+        player_2_old_points = self._player_points(PLAYER_2)
 
-        if not self._player_pick(1, action):
-            self._player2()
+        player_turn = self.execute_action(action)
 
-        player_1_points = self._player_points(1)
-        player_2_points = self._player_points(2)
+        player_1_points = self._player_points(PLAYER_1)
+        player_2_points = self._player_points(PLAYER_2)
 
         new_player_1_points = player_1_points - player_1_old_points
         new_player_2_points = player_2_points - player_2_old_points
@@ -243,16 +145,20 @@ class DotsAndBoxes(gym.Env):
             "new_player_2_points": new_player_2_points,
             "reward": reward,
             "done": self.done,
+            "player_turn": player_turn
         }
 
-        return self._get_current_observation(), info
+        return self._get_current_observation(), reward, self.done, self.done, info
 
-    def _player2(self):
-        new_point = True
-        while new_point and len(self.action_spaces) > 0:
-            state = self._get_current_observation()
-            action = self.policy.next_action(state, self.action_spaces)
-            new_point = self._player_pick(2, action)
+    def execute_action(self, action):
+        has_new_box = self._player_pick(self._player_turn, action)
+        if not has_new_box:
+            self.next_player()
+        return self._player_turn
+        
+    def next_player(self):
+        self._player_turn = 2 - ((self._player_turn + 1) % 2)
+    
 
     def _player_pick(self, player, action):
         old_player_points = self._player_points(player)
@@ -285,7 +191,7 @@ class DotsAndBoxes(gym.Env):
 
         return DotsAndBoxesState(
             state=list(itertools.chain.from_iterable(map(get_edges, itertools.chain.from_iterable(self.nodes)))),
-            player_points=self._player_points(1),
+            player_points=self._player_points(self._player_turn),
         )
 
     def render(self, mode="human"):
@@ -326,7 +232,7 @@ class DotsAndBoxes(gym.Env):
             self.screen.blit(text, self._get_box_screen_position(box.position))
         pygame.display.update()
 
-    def reset(self):
+    def reset(self) -> tuple[DotsAndBoxesState, dict]:
         self.nodes = [
             [DotsAndBoxes.Node((i, j), i + j * self.size) for j in range(self.size + 1)] for i in range(self.size + 1)
         ]
@@ -347,11 +253,15 @@ class DotsAndBoxes(gym.Env):
                 self.action_spaces.add((u.position, (u.position[0], u.position[1] + 1)))
             if u.position[0] < self.size:
                 self.action_spaces.add((u.position, (u.position[0] + 1, u.position[1])))
-
+        
+        player_start = PLAYER_1
         if random.choice([True, False]):
-            self._player2()
-
-        return self._get_current_observation()
+            player_start = PLAYER_2
+        info = {
+            'player_start': player_start
+        }
+        self._player_turn = player_start
+        return self._get_current_observation(), info
 
     def _get_box_screen_position(self, pos):
         corner_position = self._get_node_screen_position(pos)
