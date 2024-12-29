@@ -12,7 +12,7 @@ class MachineAgent:
         self._env = env
     
     def get_action(self, observations: DotsAndBoxesState):
-        return self._policy.next_action(observations, self._env.action_spaces)
+        return self._policy.next_action(observations, self._env.action_spaces), False
     
     def update(self, *args, **kwargs):
         pass
@@ -28,7 +28,7 @@ class UserAgent:
         user_input = input(f'give two adjacent nodes in the format "0,0 0,1": ')
         user_input = user_input.split(' ')
         action = [(int(a.split(',')[0]), int(a.split(',')[1])) for a in user_input]
-        return action
+        return action, False
     
     def update(self, *args, **kwargs):
         pass
@@ -56,18 +56,20 @@ class EpsilonGreedyAgent:
 
     def get_action(self, observations: DotsAndBoxesState):
         action_spaces = self._env.action_spaces
-        self.set_action_initial_value(observations, action_spaces)
+        new_state = self.set_action_initial_value(observations, action_spaces)
         
         if np.random.random() < self.epsilon:
             action = random.choices(list(action_spaces))[0]
         else:
             action = max(action_spaces, key=lambda a: self._policy._q_value_function.get(observations, a))
-        return action
+        return action, new_state
 
     def set_action_initial_value(self, observations: DotsAndBoxesState, action_spaces):
         if not self._policy._q_value_function.contains(observations):
             for a in action_spaces:
                 self._policy._q_value_function.define(observations, a, self._env.size)
+            return True
+        return False
     
     def update(
     self,

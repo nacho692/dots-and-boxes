@@ -30,9 +30,11 @@ def q_learning(
     rw = 0
     won = 0
     amount_of_turns = defaultdict(int)
-    
+    amount_of_states = defaultdict(int)
     for e in range(num_episodes):
-        reward_game, won_game, turns = play_one_game(env, machine_agent, learning_agent)
+        reward_game, won_game, turns, new_states = play_one_game(env, machine_agent, learning_agent)
+        for key, value in new_states.items():
+            amount_of_states[key] += value
         rw += reward_game
         won += won_game
         amount_of_turns[turns] += 1
@@ -40,21 +42,22 @@ def q_learning(
         if e % 100 == 0:
             avg_rw = rw / 100
             avg_won = won / 100
-            #average_new_states = sum((key*value for key, value in new_states.items())) / sum(new_states.values())
+            average_new_states = sum((key*value for key, value in amount_of_states.items())) / sum(amount_of_states.values())
             average_amount_of_turns = sum((key*value for key, value in amount_of_turns.items())) / sum(amount_of_turns.values())
             logging.info(
-                f"episode: {e}, reward rate: {avg_rw:.2f}, avg_won: {avg_won:.2%}. avg_pd_aot {average_amount_of_turns:.2f}"
+                f"episode: {e}, reward rate: {avg_rw:.2f}, avg_won: {avg_won:.2%}. avg_new_states {average_new_states:.2f}. avg_aot {average_amount_of_turns:.2f}"
             )
             
             
             if avg_won > 0.65:
-                logging.info(f"Update q value function: episode: {e}, reward rate: {avg_rw:.2f}, avg_won: {avg_won:.2%}. avg_pd_aot {average_amount_of_turns:.2%}")
+                logging.info(f"Update q value function: episode: {e}, reward rate: {avg_rw:.2f}, avg_won: {avg_won:.2%}.")
                 machine_agent.update_value_function(learning_agent._policy._q_value_function)
                 q_file = f"q_value_function_{board_size}x{board_size}_epoch{e}.pickle"
                 save_value_function(q_file, learning_agent._policy._q_value_function)
             rw = 0
             won = 0
             amount_of_turns = defaultdict(int)
+            amount_of_states = defaultdict(int)
 
     return learning_agent._policy._q_value_function
 
@@ -63,7 +66,7 @@ def play_one_game(env: DotsAndBoxes, machine_agent, learning_agent, render=False
     turn = 0
     rw = 0
     done = False
-    
+    new_states = defaultdict(int)
     while not done:
         if render:
             env.render()
@@ -72,7 +75,9 @@ def play_one_game(env: DotsAndBoxes, machine_agent, learning_agent, render=False
             player = learning_agent
         else:
             player = machine_agent
-        action = player.get_action(state)
+        action, new_state = player.get_action(state)
+        if player_turn == PLAYER_1 and new_state:
+            new_states[turn] = 1
         next_state, reward, done, _, info = env.step(action)
         player.update(state, action, reward, done, next_state)
             
@@ -84,7 +89,7 @@ def play_one_game(env: DotsAndBoxes, machine_agent, learning_agent, render=False
     if render:
         env.render()
     won = info.get("player_1_points") > info.get("player_2_points")
-    return rw, won, turn
+    return rw, won, turn, new_states
 
 
 def play_against_player(board_size, q_file):
@@ -125,7 +130,7 @@ def train(epochs: int, matches_per_epoch: int, board_size: int, q_file:str):
         )
         
         save_value_function(q_file, q_value_function)
-        break
+        
 
     logging.info("finished training")
 
