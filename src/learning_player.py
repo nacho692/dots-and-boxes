@@ -1,4 +1,3 @@
-import logging
 import bitstring as bitstring
 import itertools
 
