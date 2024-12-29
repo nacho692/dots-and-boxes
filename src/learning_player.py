@@ -1,3 +1,4 @@
+import logging
 import bitstring as bitstring
 import itertools
 
@@ -248,7 +249,6 @@ class BoardSaver:
 
     def get(self, state: DotsAndBoxesState, action):
         _board, _action = self._equivalent_board_action(state.state, action)
-
         return self.boards[_board][state.player_points][_action]
 
     def define(self, state: DotsAndBoxesState, action, value):
